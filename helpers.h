@@ -35,3 +35,55 @@ private:
     uint8_t next_file_number;
     std::mutex mx;
 };
+
+class TmpFileBalancer {
+public:
+    explicit TmpFileBalancer(const std::unordered_map<std::string, std::unordered_set<std::string>>& similar_files) {
+        files = similar_files;
+        next_files_bunch = similar_files.begin();
+    }
+    ~TmpFileBalancer() = default;
+
+    void Run(const std::string& output_dir) {
+        while (next_files_bunch != files.end()) {
+            mx.lock();
+            const auto& [file_name, similar_file_paths] = *next_files_bunch;
+            next_files_bunch++;
+            mx.unlock();
+
+            std::unordered_map<std::string, uint32_t> props;
+
+            for (const auto& file_path: similar_file_paths) {
+                std::ifstream file(file_path);
+                if (!file.is_open()) {
+                    std::cerr << "IFile open error: " << file_path;
+                }
+
+                std::string tuple;
+                while (std::getline(file, tuple)) {
+                    if (props.find(tuple) == props.end()) {
+                        props[tuple] = 1;
+                    } else {
+                        props[tuple] += 1;
+                    }
+                }
+
+                for (const auto& [prop, c]: props) {
+                    std::cout << "%% " << prop << ": " << c << std::endl;
+                }
+            }
+
+            std::ofstream outfile(output_dir + file_name, std::ios::app);
+            if (!outfile.is_open()) {
+                std::cerr << "OFile open error: " << file_name;
+            }
+            for (const auto& [tuple, counter]: props) {
+                outfile << "{\"props\": [" << tuple << "], \"count\": " << std::to_string(counter) << "}" << std::endl;
+            }
+        }
+    }
+private:
+    std::unordered_map<std::string, std::unordered_set<std::string>> files;
+    std::unordered_map<std::string, std::unordered_set<std::string>>::const_iterator next_files_bunch;
+    std::mutex mx;
+};

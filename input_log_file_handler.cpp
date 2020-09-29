@@ -1,8 +1,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
-#include <time.h>
+#include <ctime>
 #include <experimental/filesystem>
 
 #include "input_log_file_handler.h"
@@ -19,15 +18,10 @@ namespace {
     };
 
     std::string PrepareDate(const std::uint64_t& timestamp) {
-        time_t rawtime;
-        struct tm * ptm;
-        time(&rawtime);
-        ptm = gmtime(&rawtime);
-
+        time_t rawtime = timestamp;
+        struct tm* ptm = gmtime(&rawtime);
         std::stringstream date;
-        date << std::to_string(ptm->tm_year) <<
-            "-" << std::setfill('0') << std::setw(2) << std::to_string(ptm->tm_mon) <<
-            "-" <<std::setfill('0') << std::setw(2) << std::to_string(ptm->tm_mday);
+        date << std::put_time(ptm, "%Y-%m-%d");
 
         return date.str();
     }
@@ -74,7 +68,7 @@ InputLogFileHandler::InputLogFileHandler(const std::string& infile_name,
         std::cout << "## line: " << line << std::endl;
         const auto& parsed_raw = ParseInitRaw(line);
 
-        const auto& outfile_name = parsed_raw.date + "_" + parsed_raw.fact_name + ".txt";
+        const auto& outfile_name = parsed_raw.date + "_" + parsed_raw.fact_name;
         auto* outfile = FindOutfile(outfile_name);
         if (outfile->is_open()) {
             *outfile << parsed_raw.props << std::endl;

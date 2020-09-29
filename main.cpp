@@ -10,14 +10,16 @@
 
 #include "helpers.h"
 #include "input_log_file_handler.h"
+#include "balansers.h"
 
 namespace {
     namespace fs = std::experimental::filesystem;
-    const fs::path tmp_dir_pref = fs::temp_directory_path() / "dir";
 
-    fs::path MakeDirectory(const unsigned thread_number) {
-        fs::create_directory(tmp_dir_pref);
-        fs::path dir_path = tmp_dir_pref / std::to_string(thread_number);
+    fs::path MakeDirectory(const unsigned number) {
+        static const fs::path prev_dir = fs::temp_directory_path() / "dir";
+        fs::create_directory(prev_dir);
+
+        fs::path dir_path = prev_dir / std::to_string(number);
         if (fs::exists(dir_path)) {
             fs::remove_all(dir_path);
         }
@@ -26,46 +28,121 @@ namespace {
         return dir_path;
     }
 
-    std::vector<fs::path> HandleInputFiles(const std::string& log_dir_path, const uint8_t files_number,
+    std::vector<fs::path> HandleInputFiles(const std::string& input_dir_path, const uint8_t files_number,
                                            const uint8_t threads_number) {
         std::vector<std::thread> threads;
         threads.reserve(threads_number);
-        std::vector<fs::path> tmp_dir_paths;
-        tmp_dir_paths.reserve(threads_number);
+        std::vector<fs::path> tmp_output_dir_paths;
+        tmp_output_dir_paths.reserve(threads_number);
 
-        FileBalancer balancer(files_number);
+        InputFilesBalancer balancer(files_number);
         for (int thread_num = 1; thread_num <= threads_number; thread_num++) {
-            const auto& tmp_dir_path = MakeDirectory(thread_num);
-            std::thread th([&balancer, &log_dir_path, &tmp_dir_path]() { balancer.Run(log_dir_path, tmp_dir_path); });
+            const auto& output_dir_path = MakeDirectory(thread_num);
+            std::thread th(
+                [&balancer, &input_dir_path, &output_dir_path]() {
+                    balancer.Run(input_dir_path, output_dir_path);
+                }
+            );
             threads.push_back(std::move(th));
-            tmp_dir_paths.push_back(tmp_dir_path);
+            tmp_output_dir_paths.push_back(output_dir_path);
+        }
+        for (auto& th: threads) {
+            th.join();
+        }
+
+        return tmp_output_dir_paths;
+    }
+
+    std::unordered_map<std::string, std::unordered_set<std::string>> AggregateDirFiles(
+            const std::vector<fs::path>& tmp_dir_paths) {
+        std::unordered_map<std::string, std::unordered_set<std::string>> similar_files;
+
+        for (const auto& tmp_dir_path: tmp_dir_paths) {
+            for (auto& file: fs::directory_iterator(tmp_dir_path)) {
+                std::cout << "tmp_out_file: " << file.path() << std::endl;
+                if (similar_files.find(file.path().filename()) == similar_files.end()) {
+                    similar_files[file.path().filename()] = { file.path().string() };
+                } else {
+                    similar_files[file.path().filename()].insert(file.path().string());
+                }
+            }
+        }
+
+        return similar_files;
+    }
+
+    void HandleTmpOutputFiles(const uint8_t threads_number, const SimilarFiles& similar_files,
+                              const std::string& tmp_output_dir) {
+        std::vector<std::thread> threads;
+        threads.reserve(threads_number);
+
+        TmpOutputFilesBalancer balancer(similar_files);
+        for (int thread_num = 1; thread_num <= threads_number; thread_num++) {
+            if (fs::exists(tmp_output_dir)) {
+                fs::remove_all(tmp_output_dir);
+            }
+            fs::create_directory(tmp_output_dir);
+            std::thread th([&balancer, &tmp_output_dir]() { balancer.Run(tmp_output_dir); });
+            threads.push_back(std::move(th));
         }
 
         for (auto& th: threads) {
             th.join();
         }
-
-        return tmp_dir_paths;
     }
 
-    std::unordered_map<std::string, std::unordered_set<std::string>> AggregateDirFiles(
-            const std::vector<fs::path>& tmp_dir_paths) {
-        std::unordered_map<std::string, std::unordered_set<std::string>> dir_files;
-
-        for (const auto& tmp_dir_path: tmp_dir_paths) {
-            std::unordered_set<std::string> files;
-            std::cout << "$ " << tmp_dir_path.string() << std::endl;
-            for (auto& file: fs::directory_iterator(tmp_dir_path)) {
-                files.insert(file.path().filename());
-                std::cout << "$$ " << file.path().filename() << std::endl;
-            }
-            dir_files[tmp_dir_path.string()] = files;
+    std::string PreparePropsList(const std::string& file_name) {
+        std::ifstream file(file_name);
+        if (!file.is_open()) {
+            std::cerr << "IFile open error: " << file_name << std::endl;
         }
 
-        return dir_files;
+        std::string props_list;
+        std::string props;
+        while (std::getline(file, props)) {
+            props_list += props + ", ";
+        }
+        props_list.pop_back();
+        props_list.pop_back();
+
+        return props_list;
+    }
+
+    void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir) {
+        if (fs::exists(target_dir)) {
+            fs::remove_all(target_dir);
+        }
+        fs::create_directory(target_dir);
+        std::ofstream target_file(target_dir + "/agr.txt");
+        if (!target_file.is_open()) {
+            std::cerr << "OFile open error: agr.txt" << std::endl;
+        }
+        target_file << "{";
+        std::string prev_date;
+        std::string prev_fact_name;
+        for(const auto& tmp_file: fs::directory_iterator(tmp_dir)) {
+            const auto& file_name = tmp_file.path().filename().string();
+            const auto& cur_date = file_name.substr(0, 10);
+            const auto& cur_fact_name = file_name.substr((11));
+            std::cout << "##### " << file_name << " " << cur_date << " " << cur_fact_name << std::endl;
+            if (cur_date != prev_date) {
+                target_file << "\"" << cur_date << "\": {"
+                    << "\"" << cur_fact_name << "\": ["
+                    << PreparePropsList(tmp_file.path().string())
+                    << "]";
+            } else {
+                target_file << ", \"" << cur_fact_name << "\": ["
+                    << PreparePropsList(tmp_file.path().string())
+                    << "]";
+            }
+
+        }
     }
 }
 
+// 0 - Ok
+// 1 - Invalid argument
+// 2 -
 int main(int argc, char** argv) {
     if (argc != 4) {
         std::cerr << "Invalid number of arguments. You need enter binary file "
@@ -73,7 +150,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const std::string log_dir_path = argv[1];
+    const std::string input_dir_path = argv[1];
 
     char* er;
     const int files_number = strtol(argv[2], &er, 10);
@@ -88,72 +165,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const auto& tmp_dir_paths = HandleInputFiles(log_dir_path, files_number, threads_number);
-    const int tmp_dirs_number = tmp_dir_paths.size();
-    if (tmp_dirs_number != files_number) {
-        std::cerr << "Temporary directories number is not equal input files number " << tmp_dirs_number << " " << files_number << std::endl;
-        return 2;
-    }
+    const auto& tmp_output_dir_paths = HandleInputFiles(input_dir_path, files_number, threads_number);
+    const auto& similar_files = AggregateDirFiles(tmp_output_dir_paths);
 
-    if (tmp_dirs_number) {
-        std::unordered_map<std::string, std::unordered_set<std::string>> dir_files;
-//        TODO: calculate the largest dir
-        if (tmp_dirs_number > 1) {
-            dir_files = AggregateDirFiles(tmp_dir_paths);
-        }
-
-        for (int thread_num = 0; thread_num < threads_number; thread_num++) {
-            std::thread th;
-        }
-
-        for (const auto& dir_entry: fs::directory_iterator(tmp_dir_paths[0])) {
-            const auto& merge_file_path = dir_entry.path();
-            std::fstream merge_file(merge_file_path, std::ios::out|std::ios::in);
-            if (!merge_file.is_open()) {
-                std::cerr << "IOFile open error: " << merge_file_path;
-                return 3;
-            }
-
-            std::unordered_map<std::string, uint32_t> props;
-            std::string tuple;
-            while (std::getline(merge_file, tuple)) {
-                if (props.find(tuple) == props.end()) {
-                    props[tuple] = 1;
-                } else {
-                    props[tuple] += 1;
-                }
-            }
-
-            for (const auto& [prop, c]: props) {
-                std::cout << "%% " << prop << std::endl;
-            }
-
-            if (!dir_files.empty()) {
-                for (auto& [dir, files]: dir_files) {
-                    const auto& same_name_file = files.find(merge_file_path.filename());
-                    if (same_name_file == files.end()) {
-                        continue;
-                    }
-
-                    std::ifstream file(dir + "/" + *same_name_file);
-                    if (!merge_file.is_open()) {
-                        std::cerr << "IFile open error: " << merge_file_path;
-                        return 3;
-                    }
-
-                    std::string tuple;
-                    while (merge_file >> tuple) {
-                        if (props.find(tuple) == props.end()) {
-                            props[tuple] = 1;
-                        } else {
-                            props[tuple] += 1;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    const auto& tmp_output_dir = "/tmp/dir2";
+    HandleTmpOutputFiles(threads_number, similar_files, tmp_output_dir);
+    PrepareResultFile(tmp_output_dir, "/tmp/res");
     std::cout << "Hello, World!" << std::endl;
     return 0;
 }

@@ -15,7 +15,6 @@ public:
     InputLogFileHandler& operator=(InputLogFileHandler&& other) = delete;
     ~InputLogFileHandler();
 
-
 private:
     std::ofstream* FindOutfile(const std::string& file_name);
 
