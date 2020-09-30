@@ -22,6 +22,4 @@ void AggregateSameDateAndFactNameFiles(const uint8_t threads_number,
                           const std::unordered_map<std::string, std::unordered_set<std::string>>& similar_files,
                           const std::string& tmp_output_dir);
 
-std::string PreparePropsList(const std::string& file_name);
-
 void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir);

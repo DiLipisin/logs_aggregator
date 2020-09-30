@@ -36,21 +36,26 @@ void TmpOutputFilesBalancer::Run(const std::string& output_dir) {
         next_files_bunch++;
         mx.unlock();
 
-
-        std::map<std::string, uint32_t> props;
+        std::map<std::string, std::map<std::string, uint32_t>> facts;
 
         for (const auto& file_path: similar_file_paths) {
             std::ifstream file(file_path);
             if (!file.is_open()) {
-                throw IFileOpenException("One of similar files opening error: " + file_path);
+                throw IFileOpenException("One of same date files opening error: " + file_path);
             }
 
-            std::string tuple;
-            while (std::getline(file, tuple)) {
-                if (props.find(tuple) == props.end()) {
-                    props[tuple] = 1;
+            std::string line;
+            while (std::getline(file, line)) {
+                const auto pipe = line.find('|');
+                std::string fact_name = line.substr(0, pipe);
+                std::string props = line.substr(pipe + 1);
+
+                if (facts.find(fact_name) == facts.end()) {
+                    facts[fact_name] = {{props, 1}};
+                } else if (facts[fact_name].find(props) == facts[fact_name].end()) {
+                    facts[fact_name].insert({props, 1});
                 } else {
-                    props[tuple] += 1;
+                    facts[fact_name][props] += 1;
                 }
             }
         }
@@ -61,8 +66,18 @@ void TmpOutputFilesBalancer::Run(const std::string& output_dir) {
             std::cerr << "OFile open error: " << file_name << std::endl;
             throw OFileOpenException("Tmp file opening error: " + outfile_name);
         }
-        for (const auto& [tuple, counter]: props) {
-            outfile << "{\"props\": [" << tuple << "], \"count\": " << std::to_string(counter) << "}" << std::endl;
+
+        for (const auto& [fact_name, props]: facts) {
+            outfile << "\"" << fact_name << "\": [";
+            if (props.size() > 1) {
+                for (auto it = props.begin(); it != std::prev(props.end(), 1); it++) {
+                    outfile << "{\"props\": [" << it->first << "], "
+                            << "\"count\": " << std::to_string(it->second) << "}, ";
+                }
+            }
+            auto it = std::prev(props.end(), 1);
+            outfile << "{\"props\": [" << it->first << "], "
+                    << "\"count\": " << std::to_string(it->second) << "}]" << std::endl;
         }
     }
 }

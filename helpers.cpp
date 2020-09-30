@@ -4,7 +4,31 @@
 #include <sstream>
 #include <set>
 
-namespace fs = std::experimental::filesystem;
+namespace {
+    namespace fs = std::experimental::filesystem;
+
+    struct FilePathsComparator {
+        bool operator()(const fs::path &lhs, const fs::path &rhs) const {
+            return lhs.filename().string() < rhs.filename().string();
+        }
+    };
+
+    void WriteDateFile(const std::string &file_name, std::ostream &target_file) {
+        std::ifstream file(file_name);
+        if (!file.is_open()) {
+            std::cerr << "IFile open error: " << file_name << std::endl;
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            if (file.peek() == EOF) {
+                target_file << line;
+            } else {
+                target_file << line + ", ";
+            }
+        }
+    }
+}
 
 void MakeDirectory(const std::string& dir_path) {
     if (fs::exists(dir_path)) {
@@ -47,7 +71,6 @@ std::unordered_map<std::string, std::unordered_set<std::string>> GetSameNameFile
 
     for (const auto& tmp_dir_path: tmp_dir_paths) {
         for (auto& file: fs::directory_iterator(tmp_dir_path)) {
-//            std::cout << "tmp_out_file: " << file.path() << std::endl;
             if (aggregated_files.find(file.path().filename()) == aggregated_files.end()) {
                 aggregated_files[file.path().filename()] = { file.path().string() };
             } else {
@@ -75,23 +98,6 @@ void AggregateSameDateAndFactNameFiles(const uint8_t threads_number, const Simil
     }
 }
 
-std::string PreparePropsList(const std::string& file_name) {
-    std::ifstream file(file_name);
-    if (!file.is_open()) {
-        std::cerr << "IFile open error: " << file_name << std::endl;
-    }
-
-    std::string props_list;
-    std::string props;
-    while (std::getline(file, props)) {
-        props_list += props + ", ";
-    }
-    props_list.pop_back();
-    props_list.pop_back();
-
-    return props_list;
-}
-
 void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir) {
     if (fs::exists(target_dir)) {
         fs::remove_all(target_dir);
@@ -102,13 +108,6 @@ void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir
         std::cerr << "OFile open error: agr.txt" << std::endl;
     }
 
-//    std::stringstream target_file;
-
-    struct FilePathsComparator {
-        bool operator()(const fs::path& lhs, const fs::path& rhs) const {
-            return lhs.filename().string() < rhs.filename().string();
-        }
-    };
     std::set<fs::path, FilePathsComparator> file_paths;
     for (const auto& tmp_file: fs::directory_iterator(tmp_dir)) {
         file_paths.insert(tmp_file.path());
@@ -118,33 +117,22 @@ void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir
     bool date_open = false;
     bool start = true;
     std::string prev_date;
-    std::string prev_fact_name;
     for (const auto& file_path: file_paths) {
         const auto& file_name = file_path.filename().string();
-        const auto& cur_date = file_name.substr(0, 10);
-        const auto& cur_fact_name = file_name.substr((11));
+        const auto& cur_date = file_name;
         if (date_open && cur_date != prev_date) {
             target_file << "}";
-//            std::cout << "3 " << target_file.str()<< std::endl;
             date_open = false;
         }
         if (!start) {
             target_file << ", ";
-//            std::cout << "4 " << target_file.str() << std::endl;
         }
-//        std::cout << "$$$ " << cur_date << " " << prev_date << std::endl;
         if (cur_date != prev_date) {
-            target_file << "\"" << cur_date << "\": {"
-                        << "\"" << cur_fact_name << "\": ["
-                        << PreparePropsList(file_path.string())
-                        << "]";
-//            std::cout << "1 " << target_file.str() << std::endl;
+            target_file << "\"" << cur_date << "\": {";
+            WriteDateFile(file_path.string(), target_file);
             date_open = true;
         } else {
-            target_file << "\"" << cur_fact_name << "\": ["
-                        << PreparePropsList(file_path.string())
-                        << "]";
-//            std::cout << "2 " << target_file.str()<< std::endl;
+            WriteDateFile(file_path.string(), target_file);
         }
         prev_date = cur_date;
         start = false;

@@ -3,5 +3,4 @@
 *.swp
 **/.cache/
 **/__pycache__/
-tests/log_dir/
 tests/venv/

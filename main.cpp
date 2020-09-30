@@ -1,9 +1,6 @@
+#include <chrono>
 #include <iostream>
-#include <unordered_map>
-#include <unordered_set>
 #include <string>
-#include <thread>
-#include <vector>
 
 #include "balansers.h"
 #include "helpers.h"
@@ -37,18 +34,33 @@ int main(int argc, char** argv) {
     namespace fs = std::experimental::filesystem;
     static const std::string splitted_files_dir = (fs::temp_directory_path() / "dir").string();
     MakeDirectory(splitted_files_dir);
+    auto timer = std::chrono::system_clock::now();
     const auto& tmp_output_dir_paths = SplitLogsByDateAndFactName(
             input_dir_path, files_number, threads_number, splitted_files_dir);
+    std::cout << "SplitLogsByDateAndFactName: "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
+        << std::endl;
 
+    timer = std::chrono::system_clock::now();
     const auto& aggregated_file_names = GetSameNameFiles(tmp_output_dir_paths);
+    std::cout << "GetSameNameFiles: "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
+        << std::endl;
 
     static const std::string aggregated_files_dir = (fs::temp_directory_path() / "dir2").string();
     MakeDirectory(aggregated_files_dir);
+    timer = std::chrono::system_clock::now();
     AggregateSameDateAndFactNameFiles(threads_number, aggregated_file_names, aggregated_files_dir);
+    std::cout << "AggregateSameDateAndFactNameFiles: "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
+        << std::endl;
 
     MakeDirectory(output_dir_path);
+    timer = std::chrono::system_clock::now();
     PrepareResultFile(aggregated_files_dir, output_dir_path);
+    std::cout << "PrepareResultFile: "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
+        << std::endl;
 
-    std::cout << "Hello, World1!" << std::endl;
     return 0;
 }

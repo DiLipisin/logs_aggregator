@@ -4,10 +4,8 @@
 #include <thread>
 #include "input_log_file_handler.h"
 
-#include "lib/jsoncpp/include/json/json.h"
 #include "exceptions.h"
-
-#include <thread>
+#include "lib/jsoncpp/include/json/json.h"
 
 namespace {
     namespace fs = std::experimental::filesystem;
@@ -37,7 +35,6 @@ namespace {
 
         const auto line_length = static_cast<int>(line.length());
 
-//        std::cout << "LINE: " << line << std::endl;
         Json::CharReaderBuilder builder;
         const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         if (!reader->parse(line.c_str(), line.c_str() + line_length, &json,
@@ -53,9 +50,6 @@ namespace {
             raw.props += json["props"]["prop" + std::to_string(i + 1)].asString() + ", ";
         }
         raw.props += json["props"]["prop10"].asString();
-//        std::cout << std::this_thread::get_id() << " timestamp: " << timestamp << " raw.date: " << raw.date << std::endl;
-//        std::cout << std::this_thread::get_id() << " raw.fact_name: " << raw.fact_name << std::endl;
-//        std::cout << std::this_thread::get_id() << " raw.props: " << raw.props << std::endl;
 
         return raw;
     }
@@ -71,12 +65,13 @@ InputLogFileHandler::InputLogFileHandler(const std::string infile_name,
         try {
             const auto& parsed_raw = ParseInitRaw(line);
 
-            const auto& outfile_name = parsed_raw.date + "_" + parsed_raw.fact_name;
+            const auto& outfile_name = parsed_raw.date;
             auto* outfile = FindOutfile(outfile_name);
             if (!outfile->is_open()) {
-                std::cerr << "Temporary outfile open error: " << dir_path + "/" + outfile_name << strerror(errno) << std::endl;
+                std::cerr << "Temporary outfile `" << dir_path + "/" + outfile_name
+                    << "` open error: " << strerror(errno) << std::endl;
             }
-            *outfile << parsed_raw.props << std::endl;
+            *outfile << parsed_raw.fact_name << "|" << parsed_raw.props << std::endl;
         } catch (JsonParseException& ex) {
             std::cerr << ex.what() << std::endl;
         }

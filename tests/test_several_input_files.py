@@ -1,6 +1,4 @@
 import json
-import os
-import shutil
 import subprocess
 
 from datetime import datetime
@@ -15,10 +13,10 @@ def test_ok():
     bin_path = '../cmake-build-debug/bin/logs'
     logs_dir = '/tmp/log_dir'
     files_number = 10
-    threads_number = 10
+    threads_number = 1
     result_dir = '/tmp/res'
     test_result_dir = '/tmp/test_res'
-    file_lines_number = 10000
+    file_lines_number = 1000000
 
     fact_names = ['fact_name' + str(i) for i in range(1, 100)]
     utils.make_dir(logs_dir)
