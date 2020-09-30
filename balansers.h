@@ -17,7 +17,7 @@ public:
     InputFilesBalancer(InputFilesBalancer&& other) = delete;
     ~InputFilesBalancer() = default;
 
-    void Run(const std::string& log_dir_path, const std::string& tmp_dir_path);
+    void Run(const std::string& log_dir_path, const std::string tmp_dir_path);
 private:
     uint8_t files_number;
     uint8_t next_file_number;

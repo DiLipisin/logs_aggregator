@@ -1,5 +1,7 @@
-/.idea/logs.iml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/.gitignore
+/.idea
 /cmake-build-debug/
+*.swp
+**/.cache/
+**/__pycache__/
+tests/log_dir/
+tests/venv/

@@ -7,8 +7,8 @@
 
 class InputLogFileHandler {
 public:
-    explicit InputLogFileHandler(const std::string& infile_name,
-                                 const std::experimental::filesystem::path& abs_dir_path);
+    explicit InputLogFileHandler(const std::string infile_name,
+                                 const std::string& abs_dir_path);
     InputLogFileHandler(const InputLogFileHandler& other) = delete;
     InputLogFileHandler(InputLogFileHandler&& other) = delete;
     InputLogFileHandler& operator=(const InputLogFileHandler& other) = delete;
@@ -18,7 +18,7 @@ public:
 private:
     std::ofstream* FindOutfile(const std::string& file_name);
 
-    std::experimental::filesystem::path dir_path;
+    std::string dir_path;
     std::ifstream infile;
     std::unordered_map<std::string, std::ofstream*> outfiles;
 };
