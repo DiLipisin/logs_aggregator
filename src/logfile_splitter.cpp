@@ -2,10 +2,10 @@
 #include <iostream>
 #include <ctime>
 #include <thread>
-#include "input_log_file_handler.h"
 
-#include "exceptions.h"
-#include "lib/jsoncpp/include/json/json.h"
+#include "logfile_splitter.h"
+#include "utils.h"
+#include "../lib/jsoncpp/include/json/json.h"
 
 namespace {
     namespace fs = std::experimental::filesystem;
@@ -20,8 +20,7 @@ namespace {
         time_t rawtime = timestamp;
         struct tm buf{};
         if (!gmtime_r(&rawtime, &buf)) {
-            std::cerr << "Timestamp converting error" << std::endl;
-            throw;
+            throw std::runtime_error("Timestamp converting error: " + std::to_string(timestamp));
         }
         std::stringstream date;
         date << std::put_time(&buf, "%Y-%m-%d");
@@ -39,7 +38,7 @@ namespace {
         const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         if (!reader->parse(line.c_str(), line.c_str() + line_length, &json,
                            &err)) {
-            throw JsonParseException("Json line parsing error: " + line);
+            throw std::runtime_error("Json line='" + line + "' parsing error: " + err);
         }
 
         InitParsedRaw raw;
@@ -55,30 +54,33 @@ namespace {
     }
 }
 
-InputLogFileHandler::InputLogFileHandler(const std::string infile_name,
+LogfileSplitter::LogfileSplitter(const std::string& infile_name,
                                          const std::string& abs_dir_path) {
     dir_path = abs_dir_path;
     infile.open(infile_name);
 
     std::string line;
-    while (std::getline(infile, line)) {
-        try {
+    try {
+        while (std::getline(infile, line)) {
             const auto& parsed_raw = ParseInitRaw(line);
 
             const auto& outfile_name = parsed_raw.date;
             auto* outfile = FindOutfile(outfile_name);
             if (!outfile->is_open()) {
-                std::cerr << "Temporary outfile `" << dir_path + "/" + outfile_name
-                    << "` open error: " << strerror(errno) << std::endl;
+                const auto& path = dir_path + "/" + outfile_name;
+                std::cerr << "Temporary outfile " << path
+                    << " opening error: " << HandleErrno(errno) << std::endl;
+                throw std::runtime_error("OFile open error: " + path);
             }
+
             *outfile << parsed_raw.fact_name << "|" << parsed_raw.props << std::endl;
-        } catch (JsonParseException& ex) {
-            std::cerr << ex.what() << std::endl;
         }
+    } catch (std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
     }
 }
 
-InputLogFileHandler::~InputLogFileHandler() {
+LogfileSplitter::~LogfileSplitter() {
     if (infile.is_open()) {
         infile.close();
     }
@@ -91,7 +93,7 @@ InputLogFileHandler::~InputLogFileHandler() {
     }
 }
 
-std::ofstream* InputLogFileHandler::FindOutfile(const std::string& file_name) {
+std::ofstream* LogfileSplitter::FindOutfile(const std::string& file_name) {
     if (outfiles.find(file_name) == outfiles.end()) {
         const auto& abs_outfile_path = dir_path + "/" + file_name;
         auto *outfile = new std::ofstream(abs_outfile_path, std::ios::app);

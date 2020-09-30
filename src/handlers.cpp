@@ -1,8 +1,12 @@
-#include "helpers.h"
-#include "balansers.h"
+#include "handlers.h"
 
-#include <sstream>
+#include <iostream>
 #include <set>
+#include <stdexcept>
+
+#include "balancers.h"
+#include "logfile_splitter.h"
+#include "utils.h"
 
 namespace {
     namespace fs = std::experimental::filesystem;
@@ -16,7 +20,9 @@ namespace {
     void WriteDateFile(const std::string &file_name, std::ostream &target_file) {
         std::ifstream file(file_name);
         if (!file.is_open()) {
-            std::cerr << "IFile open error: " << file_name << std::endl;
+            std::cerr << "One of same date files " << file_name
+                      << " opening error: " << HandleErrno(errno) << std::endl;
+            throw std::runtime_error("IFile open error: " + file_name);
         }
 
         std::string line;
@@ -30,13 +36,6 @@ namespace {
     }
 }
 
-void MakeDirectory(const std::string& dir_path) {
-    if (fs::exists(dir_path)) {
-        fs::remove_all(dir_path);
-    }
-    fs::create_directory(dir_path);
-}
-
 std::vector<fs::path> SplitLogsByDateAndFactName(const std::string& input_dir_path, const uint8_t files_number,
                                                  const uint8_t threads_number, const std::string& output_dir_path) {
     std::vector<std::thread> threads;
@@ -48,7 +47,7 @@ std::vector<fs::path> SplitLogsByDateAndFactName(const std::string& input_dir_pa
     for (int thread_num = 1; thread_num <= threads_number; thread_num++) {
         const fs::path& tmp_output_dir_path = fs::path(output_dir_path) / std::to_string(thread_num);
         MakeDirectory(tmp_output_dir_path);
-        std::cout << "thread=`" << thread_num << "` writes to dir=`" << tmp_output_dir_path << "`" << std::endl;
+        std::cout << "thread=" << thread_num << " writes to dir=" << tmp_output_dir_path << std::endl;
 
         std::thread th(
                 [&balancer, &input_dir_path, tmp_output_dir_path]() {
@@ -82,12 +81,12 @@ std::unordered_map<std::string, std::unordered_set<std::string>> GetSameNameFile
     return aggregated_files;
 }
 
-void AggregateSameDateAndFactNameFiles(const uint8_t threads_number, const SimilarFiles& similar_files,
+void AggregateSameDateFiles(const uint8_t threads_number, const SameDateFiles& same_date_files,
                                        const std::string& tmp_output_dir) {
     std::vector<std::thread> threads;
     threads.reserve(threads_number);
 
-    TmpOutputFilesBalancer balancer(similar_files);
+    TmpOutputFilesBalancer balancer(same_date_files);
     for (int thread_num = 1; thread_num <= threads_number; thread_num++) {
         std::thread th([&balancer, tmp_output_dir]() { balancer.Run(tmp_output_dir); });
         threads.push_back(std::move(th));
@@ -105,7 +104,7 @@ void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir
     fs::create_directory(target_dir);
     std::ofstream target_file(target_dir + "/agr.txt");
     if (!target_file.is_open()) {
-        std::cerr << "OFile open error: agr.txt" << std::endl;
+        throw std::runtime_error("OFile open error: agr.txt");
     }
 
     std::set<fs::path, FilePathsComparator> file_paths;

@@ -2,15 +2,16 @@
 #include <iostream>
 #include <string>
 
-#include "balansers.h"
-#include "helpers.h"
+#include "src/balancers.h"
+#include "src/handlers.h"
+#include "src/utils.h"
 
 // 0 - Ok
 // 1 - Invalid argument
 int main(int argc, char** argv) {
     if (argc != 5) {
-        std::cerr << "Invalid number of arguments. You need enter binary file "
-                     "name and threads number" << std::endl;
+        std::cerr << "Invalid number of arguments. Input 4 arguments: "
+                     "log files directory, files number, threads number, result output directory" << std::endl;
         return 1;
     }
 
@@ -50,8 +51,8 @@ int main(int argc, char** argv) {
     static const std::string aggregated_files_dir = (fs::temp_directory_path() / "dir2").string();
     MakeDirectory(aggregated_files_dir);
     timer = std::chrono::system_clock::now();
-    AggregateSameDateAndFactNameFiles(threads_number, aggregated_file_names, aggregated_files_dir);
-    std::cout << "AggregateSameDateAndFactNameFiles: "
+    AggregateSameDateFiles(threads_number, aggregated_file_names, aggregated_files_dir);
+    std::cout << "AggregateSameDateFiles: "
         << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
         << std::endl;
 

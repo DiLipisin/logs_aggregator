@@ -10,13 +10,8 @@ find_package(Threads REQUIRED)
 
 add_subdirectory(lib/jsoncpp)
 
-add_executable(${PROJECT_NAME}
-    main.cpp
-    input_log_file_handler.cpp input_log_file_handler.h
-    balansers.cpp balansers.h
-    helpers.cpp helpers.h
-    exceptions.h
-)
+file(GLOB SOURCES src/*.cpp src/*.h)
+add_executable(${PROJECT_NAME} main.cpp ${SOURCES} src/utils.cpp src/utils.h)
 
 target_link_libraries(${PROJECT_NAME} jsoncpp_lib)
 target_link_libraries(${PROJECT_NAME} stdc++fs)
