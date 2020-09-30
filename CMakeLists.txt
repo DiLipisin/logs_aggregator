@@ -18,6 +18,6 @@ add_executable(${PROJECT_NAME}
     exceptions.h
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/lib/jsoncpp/lib/libjsoncpp.so)
-target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)
-target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+target_link_libraries(${PROJECT_NAME} jsoncpp_lib)
+target_link_libraries(${PROJECT_NAME} stdc++fs)
+target_link_libraries(${PROJECT_NAME} Threads::Threads)
