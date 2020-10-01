@@ -14,6 +14,8 @@ public:
     void Run(const std::string& log_dir_path, std::string tmp_dir_path);
 
 private:
+    unsigned GetNextFileNumber();
+
     uint8_t files_number;
     uint8_t next_file_number;
     std::mutex mx;
@@ -25,6 +27,8 @@ public:
     void Run(const std::string& output_dir);
 
 private:
+    std::pair<std::string, std::unordered_set<std::string>> GetNextFilesBunch();
+
     SameDateFiles files;
     SameDateFiles::const_iterator next_files_bunch;
     std::mutex mx;

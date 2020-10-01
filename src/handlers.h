@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-std::vector<std::experimental::filesystem::path> SplitLogsByDateAndFactName(
+std::vector<std::experimental::filesystem::path> SplitLogsByDate(
         const std::string& input_dir_path, uint8_t files_number,
         uint8_t threads_number, const std::string& output_dir_pat);
 

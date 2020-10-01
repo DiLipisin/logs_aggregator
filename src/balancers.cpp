@@ -63,15 +63,18 @@ InputFilesBalancer::InputFilesBalancer(const uint8_t input_files_number) {
 
 void InputFilesBalancer::Run(const std::string& log_dir_path, const std::string tmp_dir_path) {
     while (next_file_number <= files_number) {
-        mx.lock();
-        const unsigned file_number = next_file_number;
-        next_file_number++;
-        mx.unlock();
-
+        const unsigned file_number = GetNextFileNumber();
         const auto &infile_name = log_dir_path + "/file" + std::to_string(file_number) + ".log";
         std::cout << "logfile=" << infile_name << " split to tmp_dir_path=" << tmp_dir_path << std::endl;
         LogfileSplitter(infile_name, tmp_dir_path);
     }
+}
+
+unsigned InputFilesBalancer::GetNextFileNumber() {
+    std::lock_guard<std::mutex> lg(mx);
+    const unsigned file_number = next_file_number;
+    next_file_number++;
+    return file_number;
 }
 
 TmpOutputFilesBalancer::TmpOutputFilesBalancer(const SameDateFiles& same_date_files) {
@@ -82,12 +85,7 @@ TmpOutputFilesBalancer::TmpOutputFilesBalancer(const SameDateFiles& same_date_fi
 void TmpOutputFilesBalancer::Run(const std::string& output_dir) {
     try {
         while (next_files_bunch != files.end()) {
-            mx.lock();
-            const auto &file_name = next_files_bunch->first;
-            const auto &similar_file_paths = next_files_bunch->second;
-            next_files_bunch++;
-            mx.unlock();
-
+            const auto& [file_name, similar_file_paths] = GetNextFilesBunch();
             const auto &facts = PrepareFacts(similar_file_paths);
 
             std::string outfile_name = output_dir + "/" + file_name;
@@ -103,4 +101,11 @@ void TmpOutputFilesBalancer::Run(const std::string& output_dir) {
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
     }
+}
+
+std::pair<std::string, std::unordered_set<std::string>> TmpOutputFilesBalancer::GetNextFilesBunch() {
+    std::lock_guard<std::mutex> lg(mx);
+    const auto& next_bunch = *next_files_bunch;
+    next_files_bunch++;
+    return next_bunch;
 }

@@ -36,7 +36,7 @@ namespace {
     }
 }
 
-std::vector<fs::path> SplitLogsByDateAndFactName(const std::string& input_dir_path, const uint8_t files_number,
+std::vector<fs::path> SplitLogsByDate(const std::string& input_dir_path, const uint8_t files_number,
                                                  const uint8_t threads_number, const std::string& output_dir_path) {
     std::vector<std::thread> threads;
     threads.reserve(threads_number);

@@ -10,16 +10,16 @@
 namespace {
     namespace fs = std::experimental::filesystem;
 
-    struct InitParsedRaw {
+    struct InitParsedRow {
         std::string date;
         std::string fact_name;
         std::string props;
     };
 
-    std::string PrepareDate(const std::uint64_t& timestamp) {
-        time_t rawtime = timestamp;
+    std::string TimestampToDateString(const std::uint64_t& timestamp) {
+        time_t rowtime = timestamp;
         struct tm buf{};
-        if (!gmtime_r(&rawtime, &buf)) {
+        if (!gmtime_r(&rowtime, &buf)) {
             throw std::runtime_error("Timestamp converting error: " + std::to_string(timestamp));
         }
         std::stringstream date;
@@ -28,7 +28,7 @@ namespace {
         return date.str();
     }
 
-    InitParsedRaw ParseInitRaw(const std::string& line) {
+    InitParsedRow ParseInitRow(const std::string& line) {
         JSONCPP_STRING err;
         Json::Value json;
 
@@ -36,69 +36,58 @@ namespace {
 
         Json::CharReaderBuilder builder;
         const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-        if (!reader->parse(line.c_str(), line.c_str() + line_length, &json,
-                           &err)) {
+        if (!reader->parse(line.c_str(), line.c_str() + line_length, &json, &err)) {
             throw std::runtime_error("Json line='" + line + "' parsing error: " + err);
         }
 
-        InitParsedRaw raw;
+        InitParsedRow row;
         const auto& timestamp = json["ts_fact"].asUInt();
-        raw.date = PrepareDate(timestamp);
-        raw.fact_name = json["fact_name"].asString();
+        row.date = TimestampToDateString(timestamp);
+        row.fact_name = json["fact_name"].asString();
         for (int i = 0; i < 9; i++) {
-            raw.props += json["props"]["prop" + std::to_string(i + 1)].asString() + ", ";
+            row.props += json["props"]["prop" + std::to_string(i + 1)].asString() + ", ";
         }
-        raw.props += json["props"]["prop10"].asString();
+        row.props += json["props"]["prop10"].asString();
 
-        return raw;
+        return row;
     }
 }
 
-LogfileSplitter::LogfileSplitter(const std::string& infile_name,
-                                         const std::string& abs_dir_path) {
+LogfileSplitter::LogfileSplitter(const std::string& infile_name, const std::string& abs_dir_path) {
     dir_path = abs_dir_path;
-    infile.open(infile_name);
 
-    std::string line;
     try {
+        infile.open(infile_name);
+        if (!infile.is_open()) {
+            throw std::runtime_error("IFile open error: " + infile_name);
+        }
+
+        std::string line;
         while (std::getline(infile, line)) {
-            const auto& parsed_raw = ParseInitRaw(line);
+            const auto parsed_row = ParseInitRow(line);
 
-            const auto& outfile_name = parsed_raw.date;
-            auto* outfile = FindOutfile(outfile_name);
-            if (!outfile->is_open()) {
-                const auto& path = dir_path + "/" + outfile_name;
-                std::cerr << "Temporary outfile " << path
-                    << " opening error: " << HandleErrno(errno) << std::endl;
-                throw std::runtime_error("OFile open error: " + path);
-            }
-
-            *outfile << parsed_raw.fact_name << "|" << parsed_raw.props << std::endl;
+            const auto& outfile_name = parsed_row.date;
+            auto& outfile = FindOutfile(outfile_name);
+            outfile << parsed_row.fact_name << "|" << parsed_row.props << std::endl;
         }
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
     }
 }
 
-LogfileSplitter::~LogfileSplitter() {
-    if (infile.is_open()) {
-        infile.close();
-    }
-
-    for (auto& [file_name, file]: outfiles) {
-        if (file->is_open()) {
-            file->close();
-        }
-        delete file;
-    }
-}
-
-std::ofstream* LogfileSplitter::FindOutfile(const std::string& file_name) {
+std::ofstream& LogfileSplitter::FindOutfile(const std::string& file_name) {
     if (outfiles.find(file_name) == outfiles.end()) {
         const auto& abs_outfile_path = dir_path + "/" + file_name;
-        auto *outfile = new std::ofstream(abs_outfile_path, std::ios::app);
-        outfiles[file_name] = outfile;
+        outfiles[file_name] = std::ofstream(abs_outfile_path, std::ios::app);
     }
 
-    return outfiles[file_name];
+    auto& outfile = outfiles[file_name];
+    if (!outfile.is_open()) {
+        const auto& path = dir_path + "/" + file_name;
+        std::cerr << "Temporary outfile " << path
+                  << " opening error: " << HandleErrno(errno) << std::endl;
+        throw std::runtime_error("OFile open error: " + path);
+    }
+
+    return outfile;
 }

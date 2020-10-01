@@ -17,14 +17,13 @@ int main(int argc, char** argv) {
 
     const std::string input_dir_path = argv[1];
 
-    char* er;
-    const int files_number = strtol(argv[2], &er, 10);
+    const int files_number = (int)strtol(argv[2], nullptr, 10);
     if (files_number < 1) {
         std::cerr << "Invalid number of input files: " << argv[2] << std::endl;
         return 1;
     }
 
-    const int threads_number = strtol(argv[3], &er, 10);
+    const int threads_number = (int)strtol(argv[3], nullptr, 10);
     if (threads_number < 1) {
         std::cerr << "Invalid number of threads: " << argv[3] << std::endl;
         return 1;
@@ -36,9 +35,9 @@ int main(int argc, char** argv) {
     static const std::string splitted_files_dir = (fs::temp_directory_path() / "dir").string();
     MakeDirectory(splitted_files_dir);
     auto timer = std::chrono::system_clock::now();
-    const auto& tmp_output_dir_paths = SplitLogsByDateAndFactName(
+    const auto& tmp_output_dir_paths = SplitLogsByDate(
             input_dir_path, files_number, threads_number, splitted_files_dir);
-    std::cout << "SplitLogsByDateAndFactName: "
+    std::cout << "SplitLogsByDate: "
         << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
         << std::endl;
 
