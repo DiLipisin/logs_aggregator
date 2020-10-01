@@ -10,11 +10,11 @@ import utils
 
 
 def test_ok():
-    bin_path = '../cmake-build-debug/bin/logs'
+    bin_path = '../build/bin/logs'
     logs_dir = '/tmp/log_dir'
     files_number = 10
     threads_number = 10
-    result_dir = '/tmp/res'
+    result_dir = '/tmp/res_dir'
     test_result_dir = '/tmp/test_res'
     file_lines_number = 100000
 
