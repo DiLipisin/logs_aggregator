@@ -5,10 +5,14 @@
 
 namespace fs = std::experimental::filesystem;
 
-void MakeDirectory(const std::string& dir_path) {
+void RemoveDirectory(const std::string& dir_path) {
     if (fs::exists(dir_path)) {
         fs::remove_all(dir_path);
     }
+}
+
+void MakeDirectory(const std::string& dir_path) {
+    RemoveDirectory(dir_path);
     fs::create_directory(dir_path);
 }
 

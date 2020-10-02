@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #include "src/balancers.h"
@@ -57,10 +58,17 @@ int main(int argc, char** argv) {
 
     MakeDirectory(output_dir_path);
     timer = std::chrono::system_clock::now();
-    PrepareResultFile(aggregated_files_dir, output_dir_path);
+    try {
+        PrepareResultFile(aggregated_files_dir, output_dir_path);
+    } catch (std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
+    }
     std::cout << "PrepareResultFile: "
         << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - timer).count()
         << std::endl;
+
+    RemoveDirectory(splitted_files_dir);
+    RemoveDirectory(aggregated_files_dir);
 
     return 0;
 }
