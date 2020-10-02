@@ -55,13 +55,14 @@ namespace {
 
 LogfileSplitter::LogfileSplitter(const std::string& infile_name, const std::string& abs_dir_path) {
     dir_path = abs_dir_path;
+    infile.open(infile_name);
+    if (!infile.is_open()) {
+        throw std::runtime_error("IFile open error: " + infile_name);
+    }
+}
 
+void LogfileSplitter::Run() {
     try {
-        infile.open(infile_name);
-        if (!infile.is_open()) {
-            throw std::runtime_error("IFile open error: " + infile_name);
-        }
-
         std::string line;
         while (std::getline(infile, line)) {
             const auto parsed_row = ParseInitRow(line);

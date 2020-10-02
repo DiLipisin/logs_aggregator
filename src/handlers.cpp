@@ -135,6 +135,8 @@ void PrepareResultFile(const std::string& tmp_dir, const std::string& target_dir
         }
         prev_date = cur_date;
         start = false;
+
+        std::cout << "File " << file_path << " was written to the result file" << std::endl;
     }
     target_file << "}}";
 }

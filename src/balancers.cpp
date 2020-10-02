@@ -66,8 +66,9 @@ void InputFilesBalancer::Run(const std::string& log_dir_path, const std::string 
         while (next_file_number <= files_number) {
             const unsigned file_number = GetNextFileNumber();
             const auto &infile_name = log_dir_path + "/file" + std::to_string(file_number) + ".log";
-            std::cout << "logfile=" << infile_name << " split to tmp_dir_path=" << tmp_dir_path << std::endl;
-            LogfileSplitter(infile_name, tmp_dir_path);
+            LogfileSplitter logfile_splitter(infile_name, tmp_dir_path);
+            logfile_splitter.Run();
+            std::cout << "logfile=" << infile_name << " splitted to tmp_dir_path=" << tmp_dir_path << std::endl;
         }
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
@@ -101,6 +102,7 @@ void TmpOutputFilesBalancer::Run(const std::string& output_dir) {
             }
 
             WriteFactsToFile(facts, outfile);
+            std::cout << "File bunch " << file_name << " aggregated" << std::endl;
         }
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;

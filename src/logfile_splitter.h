@@ -9,6 +9,7 @@
 class LogfileSplitter {
 public:
     LogfileSplitter(const std::string& infile_name, const std::string& abs_dir_path);
+    void Run();
 
 private:
     std::ofstream& FindOutfile(const std::string& file_name);
